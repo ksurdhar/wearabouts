@@ -49,4 +49,23 @@ export const ForecastResponseSchema = z.object({
   days: z.array(DayForecastSchema).length(7),
 });
 
+// Outfit generation schemas
+export const DayAdviceSchema = z.object({
+  date: z.string(), // ISO date format YYYY-MM-DD
+  outfit: z.array(z.string()).min(1), // List of outfit items
+  notes: z.string().optional(), // Optional LLM-generated advice
+});
+
+export type DayAdvice = z.infer<typeof DayAdviceSchema>;
+
+export const GenerateOutfitsRequestSchema = z.object({
+  place: ResolvedPlaceSchema,
+  days: z.array(DayForecastSchema).min(1).max(7),
+  persona: z.enum(['minimal', 'outdoorsy', 'street', 'business']).optional(),
+});
+
+export const GenerateOutfitsResponseSchema = z.object({
+  outfits: z.array(DayAdviceSchema),
+});
+
 
