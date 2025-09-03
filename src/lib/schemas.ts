@@ -27,4 +27,26 @@ export const ResolveRequestSchema = z.object({
   query: z.string().min(1),
 });
 
+// Forecast schemas
+export const DayForecastSchema = z.object({
+  date: z.string(), // ISO date format YYYY-MM-DD
+  highF: z.number(),
+  lowF: z.number(),
+  precipChance: z.number().min(0).max(100),
+  windMph: z.number().min(0),
+  uvIndex: z.number().min(0),
+  condition: z.enum(['sun', 'clouds', 'rain', 'snow', 'mixed']),
+});
+
+export type DayForecast = z.infer<typeof DayForecastSchema>;
+
+export const ForecastRequestSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+});
+
+export const ForecastResponseSchema = z.object({
+  days: z.array(DayForecastSchema).length(7),
+});
+
 
