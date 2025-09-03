@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { z } from "zod";
-import { ResolvedPlaceSchema, DayForecastSchema } from "@/lib/schemas";
+import { ResolvedPlaceSchema, DayForecastSchema, DayAdviceSchema } from "@/lib/schemas";
 import {
   Sun,
   Cloud,
@@ -17,10 +17,12 @@ import {
   Droplets,
   SunMedium,
   MapPin,
+  Shirt,
 } from "lucide-react";
 
 type ResolvedPlace = z.infer<typeof ResolvedPlaceSchema>;
 type DayForecast = z.infer<typeof DayForecastSchema>;
+type DayAdvice = z.infer<typeof DayAdviceSchema>;
 
 // Map weather conditions to Lucide icons
 function WeatherIcon({ condition, className }: { condition: DayForecast["condition"]; className?: string }) {
@@ -63,11 +65,34 @@ export default function Home() {
     candidates?: ResolvedPlace[];
   } | null>(null);
   const [forecast, setForecast] = useState<DayForecast[] | null>(null);
+  const [outfits, setOutfits] = useState<DayAdvice[] | null>(null);
+  const [loadingOutfits, setLoadingOutfits] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function fetchForecast(lat: number, lon: number) {
+  async function fetchOutfits(place: ResolvedPlace, days: DayForecast[]) {
+    setLoadingOutfits(true);
+    setOutfits(null);
+    try {
+      const res = await fetch("/api/generate-outfits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ place, days }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Outfit generation failed");
+      setOutfits(json.outfits);
+    } catch (e) {
+      console.error("Outfit generation error:", e);
+      // Don't set error - let forecast still show even if outfits fail
+    } finally {
+      setLoadingOutfits(false);
+    }
+  }
+
+  async function fetchForecast(lat: number, lon: number, place: ResolvedPlace) {
     setLoadingForecast(true);
     setForecast(null);
+    setOutfits(null);
     try {
       const res = await fetch("/api/forecast", {
         method: "POST",
@@ -77,6 +102,11 @@ export default function Home() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Forecast failed");
       setForecast(json.days);
+      
+      // Fetch outfits in the background after forecast succeeds
+      if (json.days && json.days.length > 0) {
+        fetchOutfits(place, json.days);
+      }
     } catch (e) {
       console.error("Forecast error:", e);
       setError("Failed to fetch forecast");
@@ -90,6 +120,7 @@ export default function Home() {
     setLoadingResolve(true);
     setResult(null);
     setForecast(null);
+    setOutfits(null);
     setError(null);
     
     try {
@@ -108,7 +139,7 @@ export default function Home() {
       setResult(json);
       
       // Automatically fetch forecast for the resolved place (don't await - let it load in background)
-      fetchForecast(json.place.lat, json.place.lon);
+      fetchForecast(json.place.lat, json.place.lon, json.place);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -121,7 +152,7 @@ export default function Home() {
   async function selectCandidate(candidate: ResolvedPlace) {
     setResult(prev => prev ? { ...prev, place: candidate } : null);
     // Fetch forecast in background - don't await
-    fetchForecast(candidate.lat, candidate.lon);
+    fetchForecast(candidate.lat, candidate.lon, candidate);
   }
 
   return (
@@ -230,43 +261,87 @@ export default function Home() {
                 ))
               ) : forecast ? (
                 // Actual forecast cards
-                forecast.map((day, i) => (
-                  <Card key={i} className="overflow-hidden hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="text-center space-y-2">
-                        <p className="text-sm font-medium">
-                          {formatDate(day.date)}
-                        </p>
-                        <div className="flex justify-center py-2">
-                          <WeatherIcon condition={day.condition} />
+                forecast.map((day, i) => {
+                  const dayOutfit = outfits?.find(o => o.date === day.date);
+                  return (
+                    <Card key={i} className="overflow-hidden hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* Weather Section */}
+                          <div className="text-center space-y-2">
+                            <p className="text-sm font-medium">
+                              {formatDate(day.date)}
+                            </p>
+                            <div className="flex justify-center py-2">
+                              <WeatherIcon condition={day.condition} />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-lg font-semibold">
+                                {day.highF}° / {day.lowF}°
+                              </p>
+                              {day.precipChance > 30 && (
+                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                  <Droplets className="h-3 w-3" />
+                                  {day.precipChance}%
+                                </div>
+                              )}
+                              {day.windMph > 15 && (
+                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                  <Wind className="h-3 w-3" />
+                                  {day.windMph} mph
+                                </div>
+                              )}
+                              {day.uvIndex > 6 && (
+                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                  <SunMedium className="h-3 w-3" />
+                                  UV {day.uvIndex}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Outfit Section */}
+                          {(loadingOutfits || dayOutfit) && (
+                            <>
+                              <div className="border-t pt-3">
+                                <div className="flex items-center justify-center gap-1 mb-2">
+                                  <Shirt className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-xs font-medium text-muted-foreground">What to wear</span>
+                                </div>
+                                {loadingOutfits && !dayOutfit ? (
+                                  <div className="space-y-2">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4 mx-auto" />
+                                  </div>
+                                ) : dayOutfit ? (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-1 justify-center">
+                                      {dayOutfit.outfit.slice(0, 4).map((item, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs py-0 px-1.5">
+                                          {item}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                    {dayOutfit.outfit.length > 4 && (
+                                      <p className="text-xs text-center text-muted-foreground">
+                                        +{dayOutfit.outfit.length - 4} more
+                                      </p>
+                                    )}
+                                    {dayOutfit.notes && (
+                                      <p className="text-xs text-center text-muted-foreground italic mt-2 px-2">
+                                        {dayOutfit.notes}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </>
+                          )}
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-lg font-semibold">
-                            {day.highF}° / {day.lowF}°
-                          </p>
-                          {day.precipChance > 30 && (
-                            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                              <Droplets className="h-3 w-3" />
-                              {day.precipChance}%
-                            </div>
-                          )}
-                          {day.windMph > 15 && (
-                            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                              <Wind className="h-3 w-3" />
-                              {day.windMph} mph
-                            </div>
-                          )}
-                          {day.uvIndex > 6 && (
-                            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                              <SunMedium className="h-3 w-3" />
-                              UV {day.uvIndex}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                      </CardContent>
+                    </Card>
+                  );
+                })
               ) : null}
             </div>
           </div>
