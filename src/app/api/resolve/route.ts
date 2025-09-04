@@ -7,6 +7,80 @@ import { fetchWithRetry } from "@/lib/utils";
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Helper functions for progressive prompting strategies
+function getSystemPromptForAttempt(attempt: number, failedLocations: string[]): string {
+  const basePrompt = `You are a location extraction assistant. Extract place candidates from colloquial hints and phrases.`;
+  
+  if (attempt === 1) {
+    return `${basePrompt}
+    
+Rules:
+- Return 3-5 city-level candidates maximum
+- Prefer US cities when hints reference Ivy League schools or US sports teams (MLB/NFL/NBA)
+- For regions like "Southeast Asia", return specific major cities within that region
+- Include state/province (admin1) and country when identifiable
+- Use null for unknown admin1 or country fields`;
+  }
+  
+  if (attempt === 2) {
+    return `${basePrompt}
+
+Previous attempts failed to find: ${failedLocations.join(', ')}
+
+Alternative strategies:
+- Consider common misspellings or typos
+- Try phonetically similar names
+- Look for alternate spellings or transliterations
+- Consider historical or former names
+- Try breaking compound words or joining separated words
+- Consider nearby major cities if the exact location is obscure`;
+  }
+  
+  // Attempt 3 or later
+  return `${basePrompt}
+
+All previous geocoding attempts have failed for: ${failedLocations.join(', ')}
+
+Creative fallback strategies:
+- Extract the country or region and suggest its capital or largest city
+- If it's a nickname or colloquial term, find the official name
+- For fictional or non-existent places, suggest the nearest real location
+- Consider tourist destinations or landmarks in the mentioned area
+- Try the nearest international airport city
+- Default to well-known global cities if nothing else works`;
+}
+
+function getUserPromptForAttempt(query: string, attempt: number, failedLocations: string[]): string {
+  if (attempt === 1) {
+    return `Extract location candidates from this phrase: "${query}"
+      
+Examples:
+- "the big apple" → New York (city), New York (state), United States (country)
+- "city of lights" → Paris (city), Île-de-France (admin1), France (country)
+- "emerald city" → Seattle (city), Washington (state), United States (country)
+- "Southeast Asia" → Bangkok, Singapore, Kuala Lumpur, etc. (specific cities, not the region itself)`;
+  }
+  
+  if (attempt === 2) {
+    return `The query "${query}" failed to geocode with these attempts: ${failedLocations.join(', ')}
+
+Try alternative interpretations:
+- Check for typos: "Pars" → "Paris", "Londn" → "London"
+- Phonetic matches: "Mosco" → "Moscow", "Bejing" → "Beijing"
+- Common variations: "NYC" → "New York City", "LA" → "Los Angeles"
+- Historical names: "Bombay" → "Mumbai", "Saigon" → "Ho Chi Minh City"`;
+  }
+  
+  // Attempt 3 or later
+  return `Query "${query}" has failed all standard geocoding with: ${failedLocations.join(', ')}
+
+Please be creative and suggest major cities that could be related:
+- If it mentions a country, use its capital
+- If it's a region, use the largest metropolitan area
+- If it's unclear, suggest global cities like London, Tokyo, New York
+- Consider what a tourist might mean by this phrase`;
+}
+
 // Define the tool for extracting place candidates
 const extractPlacesTool = tool({
   description: "Extract location candidates from a colloquial phrase or hint",
@@ -17,7 +91,8 @@ const extractPlacesTool = tool({
         admin1: z.string().nullable().describe("State, province, or region (null if unknown)"),
         country: z.string().nullable().describe("Country name or code (null if unknown)")
       })
-    ).min(1).max(5).describe("List of 1-5 location candidates")
+    ).min(1).max(5).describe("List of 1-5 location candidates"),
+    confidence: z.string().optional().describe("Confidence level: high, medium, or low based on query clarity")
   }),
 });
 
@@ -26,60 +101,81 @@ export async function POST(req: Request) {
     const json = await req.json();
     const { query } = ResolveRequestSchema.parse(json);
 
-    // Use generateText with tool calling for more reliable extraction
-    const result = await generateText({
-      model: openai("gpt-4o-mini"),
-      tools: {
-        extractPlaces: extractPlacesTool,
-      },
-      toolChoice: "required",
-      maxRetries: 3,
-      system: `You are a location extraction assistant. Extract place candidates from colloquial hints and phrases.
-        
-Rules:
-- Return 3-5 city-level candidates maximum
-- Prefer US cities when hints reference Ivy League schools or US sports teams (MLB/NFL/NBA)
-- For regions like "Southeast Asia", return specific major cities within that region
-- Include state/province (admin1) and country when identifiable
-- Use null for unknown admin1 or country fields`,
-      prompt: `Extract location candidates from this phrase: "${query}"
-      
-Examples:
-- "the big apple" → New York (city), New York (state), United States (country)
-- "city of lights" → Paris (city), Île-de-France (admin1), France (country)
-- "emerald city" → Seattle (city), Washington (state), United States (country)
-- "Southeast Asia" → Bangkok, Singapore, Kuala Lumpur, etc. (specific cities, not the region itself)`,
-    });
-
-    // Extract candidates from tool calls
-    let candidates: Array<{ name: string; admin1: string | null; country: string | null }> = [];
+    const maxAttempts = 3;
+    let attempt = 0;
+    let geocoded: Array<z.infer<typeof ResolvedPlaceSchema>> = [];
+    const attemptedLocations: string[] = [];
     
-    if (result.toolCalls && result.toolCalls.length > 0) {
-      const toolCall = result.toolCalls[0];
-      if (toolCall.toolName === "extractPlaces" && 'input' in toolCall) {
-        const input = toolCall.input as { candidates: Array<{ name: string; admin1: string | null; country: string | null }> };
-        candidates = input.candidates || [];
+    while (attempt < maxAttempts && geocoded.length === 0) {
+      attempt++;
+      
+      // Get progressive system prompt based on attempt
+      const systemPrompt = getSystemPromptForAttempt(attempt, attemptedLocations);
+      const userPrompt = getUserPromptForAttempt(query, attempt, attemptedLocations);
+      
+      // Use generateText with tool calling for more reliable extraction
+      const result = await generateText({
+        model: openai("gpt-4o-mini"),
+        tools: {
+          extractPlaces: extractPlacesTool,
+        },
+        toolChoice: "required",
+        maxRetries: 2,
+        system: systemPrompt,
+        prompt: userPrompt,
+      });
+
+      // Extract candidates from tool calls
+      let candidates: Array<{ name: string; admin1: string | null; country: string | null }> = [];
+      
+      if (result.toolCalls && result.toolCalls.length > 0) {
+        const toolCall = result.toolCalls[0];
+        if (toolCall.toolName === "extractPlaces" && 'input' in toolCall) {
+          const input = toolCall.input as { 
+            candidates: Array<{ name: string; admin1: string | null; country: string | null }>,
+            confidence?: string 
+          };
+          candidates = input.candidates || [];
+          
+          if (input.confidence) {
+            console.log(`Extraction confidence for "${query}": ${input.confidence}`);
+          }
+        }
+      }
+
+      // Fallback if no tool calls were made
+      if (candidates.length === 0) {
+        console.warn(`No tool calls made for query: "${query}" on attempt ${attempt}`);
+        candidates = [{ 
+          name: query.split(/[,\s]+/)[0] || query,
+          admin1: null, 
+          country: null 
+        }];
+      }
+
+      // Track attempted locations
+      attemptedLocations.push(...candidates.map(c => c.name));
+      
+      // Geocode the candidates
+      geocoded = await geocodeCandidates(candidates);
+      
+      if (geocoded.length === 0 && attempt < maxAttempts) {
+        console.log(`Attempt ${attempt} failed for "${query}", trying alternative strategies...`);
       }
     }
-
-    // Fallback if no tool calls were made
-    if (candidates.length === 0) {
-      console.warn("No tool calls made for query:", query, "- using fallback extraction");
-      candidates = [{ 
-        name: query.split(/[,\s]+/)[0] || query,
-        admin1: null, 
-        country: null 
-      }];
-    }
-
-    // Geocode the candidates
-    const geocoded = await geocodeCandidates(candidates);
     
     if (geocoded.length === 0) {
       return NextResponse.json(
         { 
-          error: "No geocoding results found",
-          suggestion: "Try a more specific location name"
+          error: "Could not locate the specified place",
+          query: query,
+          suggestions: [
+            "Try a nearby major city",
+            "Check the spelling", 
+            "Use the full country or state name",
+            "Try a well-known landmark or tourist destination"
+          ],
+          attemptedLocations: [...new Set(attemptedLocations)]
         },
         { status: 404 }
       );

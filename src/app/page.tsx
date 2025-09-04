@@ -177,7 +177,7 @@ export default function Home() {
           >
             <div className="px-6 py-4">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                Wearabouts
+                wearabouts
               </h1>
             </div>
           </motion.header>
@@ -202,7 +202,7 @@ export default function Home() {
                   opacity: 0
                 }}
                 transition={{ 
-                  duration: 1.5,
+                  duration: 0.3,
                   ease: "easeOut"
                 }}
                 className="text-center"
@@ -210,18 +210,18 @@ export default function Home() {
                 <motion.h1 
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1.2, delay: 0.2 }}
+                  transition={{ duration: 1, delay: 0.2 }}
                   className="mb-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl"
                 >
-                  Wearabouts
+                  wearabouts
                 </motion.h1>
                 <motion.p 
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1.2, delay: 0.4 }}
+                  transition={{ duration: 1, delay: 0.4 }}
                   className="mx-auto mb-8 max-w-xl text-balance text-muted-foreground"
                 >
-                  Outfit forecaster. Fit in anywhere with style recs based on place and weather.
+                  Outfit forecaster. Fit in anywhere with recs based on place and weather.
                 </motion.p>
 
                 <div className="mx-auto flex w-full max-w-xl items-center gap-2">
