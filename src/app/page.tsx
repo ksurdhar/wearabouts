@@ -19,6 +19,7 @@ import {
   MapPin,
   Shirt,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 type ResolvedPlace = z.infer<typeof ResolvedPlaceSchema>;
 type DayForecast = z.infer<typeof DayForecastSchema>;
@@ -68,6 +69,8 @@ export default function Home() {
   const [outfits, setOutfits] = useState<DayAdvice[] | null>(null);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [layoutTransitioned, setLayoutTransitioned] = useState(false);
 
   async function fetchOutfits(place: ResolvedPlace, days: DayForecast[]) {
     setLoadingOutfits(true);
@@ -117,6 +120,7 @@ export default function Home() {
 
   async function onSubmit() {
     if (!query.trim()) return;
+    setHasSearched(true);
     setLoadingResolve(true);
     setResult(null);
     setForecast(null);
@@ -156,36 +160,100 @@ export default function Home() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-6 py-12">
-      <main className="w-full">
-        <div className="text-center mb-12">
-          <h1 className="mb-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Wearabouts
-          </h1>
-          <p className="mx-auto mb-8 max-w-xl text-balance text-muted-foreground">
-            Outfit forecaster. Fit in anywhere with style recs based on place and weather.
-          </p>
+    <div className="min-h-dvh">
+      {/* Animated Header for workspace mode */}
+      <AnimatePresence>
+        {layoutTransitioned && (
+          <motion.header 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ 
+              duration: 1.5,
+              ease: "easeOut",
+              delay: 0.3
+            }}
+            className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md"
+          >
+            <div className="px-6 py-4">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                Wearabouts
+              </h1>
+            </div>
+          </motion.header>
+        )}
+      </AnimatePresence>
 
-          <div className="mx-auto flex w-full max-w-xl items-center gap-2">
-            <Input
-              placeholder="Try: ivy league weekend, or Yankees vs Red Sox in May"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Location or vibe"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onSubmit();
-              }}
-            />
-            <Button
-              className="shrink-0"
-              aria-label="Get outfits"
-              onClick={onSubmit}
-              disabled={loadingResolve || loadingForecast}
-            >
-              Get outfits
-            </Button>
-          </div>
-        </div>
+      <div className={`mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-6 ${layoutTransitioned ? 'pt-20 pb-12' : 'justify-center'} transition-all duration-1000`}>
+        <main className="w-full">
+          {/* Animated Splash content - centered vertically */}
+          <AnimatePresence 
+            mode="wait"
+            onExitComplete={() => {
+              if (hasSearched) {
+                setLayoutTransitioned(true);
+              }
+            }}
+          >
+            {!hasSearched && (
+              <motion.div 
+                initial={{ opacity: 1, y: 0 }}
+                exit={{ 
+                  opacity: 0,
+                  y: -50,
+                  scale: 0.9,
+                  filter: "blur(20px)"
+                }}
+                transition={{ 
+                  duration: 1.5,
+                  ease: [0.43, 0.13, 0.23, 0.96]
+                }}
+                className="text-center"
+              >
+                <motion.h1 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 1.2, delay: 0.2 }}
+                  className="mb-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl"
+                >
+                  Wearabouts
+                </motion.h1>
+                <motion.p 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 1.2, delay: 0.4 }}
+                  className="mx-auto mb-8 max-w-xl text-balance text-muted-foreground"
+                >
+                  Outfit forecaster. Fit in anywhere with style recs based on place and weather.
+                </motion.p>
+
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 1.2, delay: 0.6 }}
+                  className="mx-auto flex w-full max-w-xl items-center gap-2"
+                >
+                  <Input
+                    placeholder="Try: ivy league weekend, or Yankees vs Red Sox in May"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    aria-label="Location or vibe"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") onSubmit();
+                    }}
+                  />
+                  <Button
+                    className="shrink-0"
+                    aria-label="Get outfits"
+                    onClick={onSubmit}
+                    disabled={loadingResolve || loadingForecast}
+                  >
+                    Get outfits
+                  </Button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
         {/* Error display */}
         {error && (
@@ -194,16 +262,22 @@ export default function Home() {
           </div>
         )}
 
-        {/* Location result */}
-        {(loadingResolve || result) && (
-          <div className="mb-8">
-            {loadingResolve ? (
+        {/* Animated Location result */}
+        <AnimatePresence>
+          {result && (
+            <motion.div 
+              initial={{ opacity: 0, y: 60, scale: 0.85 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -30, scale: 0.9 }}
+              transition={{ 
+                duration: 1.2,
+                delay: layoutTransitioned ? 0.2 : 0,
+                ease: [0.43, 0.13, 0.23, 0.96]
+              }}
+              className="mb-8 mt-12"
+            >
               <div className="mx-auto max-w-xl">
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : result ? (
-              <div className="mx-auto max-w-xl">
-                <Card>
+                  <Card>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
@@ -241,30 +315,72 @@ export default function Home() {
                       </div>
                     </CardContent>
                   )}
-                </Card>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {/* Forecast display */}
-        {(loadingForecast || forecast) && (
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-center">7-Day Forecast</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-              {loadingForecast ? (
-                // Loading skeletons
-                Array.from({ length: 7 }).map((_, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <Skeleton className="h-48 w-full" />
                   </Card>
-                ))
-              ) : forecast ? (
-                // Actual forecast cards
-                forecast.map((day, i) => {
-                  const dayOutfit = outfits?.find(o => o.date === day.date);
-                  return (
-                    <Card key={i} className="overflow-hidden hover:shadow-md transition-shadow">
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Animated Forecast display */}
+        <AnimatePresence>
+          {(loadingForecast || forecast) && (
+            <motion.div
+              initial={{ opacity: 0, y: 60 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ 
+                duration: 0.8,
+                delay: 0.2,
+                ease: [0.43, 0.13, 0.23, 0.96]
+              }}
+            >
+              <motion.h3 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="text-lg font-semibold mb-4 text-center"
+              >
+                7-Day Forecast
+              </motion.h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {loadingForecast ? (
+                  // Loading skeletons with staggered animation
+                  Array.from({ length: 7 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ 
+                        duration: 0.4,
+                        delay: 0.5 + i * 0.05,
+                        ease: "easeOut"
+                      }}
+                    >
+                      <Card className="overflow-hidden">
+                        <Skeleton className="h-48 w-full" />
+                      </Card>
+                    </motion.div>
+                  ))
+                ) : forecast ? (
+                  // Actual forecast cards with staggered entrance
+                  forecast.map((day, i) => {
+                    const dayOutfit = outfits?.find(o => o.date === day.date);
+                    return (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 30, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ 
+                          duration: 0.5,
+                          delay: 0.6 + i * 0.08,
+                          ease: [0.43, 0.13, 0.23, 0.96]
+                        }}
+                        whileHover={{ 
+                          scale: 1.05,
+                          transition: { duration: 0.2 }
+                        }}
+                      >
+                        <Card className="overflow-hidden hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
                         <div className="space-y-3">
                           {/* Weather Section */}
@@ -339,13 +455,15 @@ export default function Home() {
                           )}
                         </div>
                       </CardContent>
-                    </Card>
-                  );
-                })
-              ) : null}
-            </div>
-          </div>
-        )}
+                        </Card>
+                      </motion.div>
+                    );
+                  })
+                ) : null}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Debug view - collapsible */}
         {result && (
@@ -365,11 +483,8 @@ export default function Home() {
             </div>
           </details>
         )}
-      </main>
-
-      <footer className="mt-16 text-center text-xs text-muted-foreground">
-        <span>v0</span>
-      </footer>
+        </main>
+      </div>
     </div>
   );
 }
