@@ -197,16 +197,13 @@ export default function Home() {
           >
             {!hasSearched && (
               <motion.div 
-                initial={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 1 }}
                 exit={{ 
-                  opacity: 0,
-                  y: -50,
-                  scale: 0.9,
-                  filter: "blur(20px)"
+                  opacity: 0
                 }}
                 transition={{ 
                   duration: 1.5,
-                  ease: [0.43, 0.13, 0.23, 0.96]
+                  ease: "easeOut"
                 }}
                 className="text-center"
               >
@@ -227,12 +224,7 @@ export default function Home() {
                   Outfit forecaster. Fit in anywhere with style recs based on place and weather.
                 </motion.p>
 
-                <motion.div 
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1.2, delay: 0.6 }}
-                  className="mx-auto flex w-full max-w-xl items-center gap-2"
-                >
+                <div className="mx-auto flex w-full max-w-xl items-center gap-2">
                   <Input
                     placeholder="Try: ivy league weekend, or Yankees vs Red Sox in May"
                     value={query}
@@ -250,7 +242,7 @@ export default function Home() {
                   >
                     Get outfits
                   </Button>
-                </motion.div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -279,22 +271,17 @@ export default function Home() {
               <div className="mx-auto max-w-xl">
                   <Card>
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <h2 className="text-lg font-semibold">
-                            {result.place.name}
-                            {result.place.admin1 && `, ${result.place.admin1}`}
-                          </h2>
-                          {result.place.country && (
-                            <p className="text-sm text-muted-foreground">{result.place.country}</p>
-                          )}
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <h2 className="text-lg font-semibold">
+                          {result.place.name}
+                          {result.place.admin1 && `, ${result.place.admin1}`}
+                        </h2>
+                        {result.place.country && (
+                          <p className="text-sm text-muted-foreground">{result.place.country}</p>
+                        )}
                       </div>
-                      <Badge variant="secondary" className="ml-2">
-                        {(result.place.confidence * 100).toFixed(0)}% match
-                      </Badge>
                     </div>
                   </CardHeader>
                   {result.candidates && result.candidates.length > 0 && (
@@ -374,10 +361,6 @@ export default function Home() {
                           duration: 0.5,
                           delay: 0.6 + i * 0.08,
                           ease: [0.43, 0.13, 0.23, 0.96]
-                        }}
-                        whileHover={{ 
-                          scale: 1.05,
-                          transition: { duration: 0.2 }
                         }}
                       >
                         <Card className="overflow-hidden hover:shadow-md transition-shadow">
