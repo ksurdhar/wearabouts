@@ -1,67 +1,129 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateObject } from "ai";
+import { generateText, tool } from "ai";
 import { ResolvedPlaceSchema, ResolveRequestSchema } from "@/lib/schemas";
 
-const CandidateSchema = z.object({
-  name: z.string(),
-  admin1: z.string().optional(),
-  country: z.string().optional(),
-});
-
-const CandidatesSchema = z.object({
-  candidates: z.array(CandidateSchema).min(1).max(5),
-});
-
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Define the tool for extracting place candidates
+const extractPlacesTool = tool({
+  description: "Extract location candidates from a colloquial phrase or hint",
+  inputSchema: z.object({
+    candidates: z.array(
+      z.object({
+        name: z.string().describe("The city or location name"),
+        admin1: z.string().nullable().describe("State, province, or region (null if unknown)"),
+        country: z.string().nullable().describe("Country name or code (null if unknown)")
+      })
+    ).min(1).max(5).describe("List of 1-5 location candidates")
+  }),
+});
 
 export async function POST(req: Request) {
   try {
     const json = await req.json();
     const { query } = ResolveRequestSchema.parse(json);
 
-    const { object } = await generateObject({
+    // Use generateText with tool calling for more reliable extraction
+    const result = await generateText({
       model: openai("gpt-4o-mini"),
-      schema: CandidatesSchema,
-      system:
-        "You extract place candidates from colloquial hints. Return 3-5 city-level candidates max with country and state/region if known. Prefer US cities when hints reference Ivy League or MLB/NFL/NBA teams. Output as JSON with a 'candidates' array of objects: name, admin1?, country?",
-      prompt: `Phrase: ${query}`,
+      tools: {
+        extractPlaces: extractPlacesTool,
+      },
+      toolChoice: "required",
+      maxRetries: 3,
+      system: `You are a location extraction assistant. Extract place candidates from colloquial hints and phrases.
+        
+Rules:
+- Return 3-5 city-level candidates maximum
+- Prefer US cities when hints reference Ivy League schools or US sports teams (MLB/NFL/NBA)
+- For regions like "Southeast Asia", return specific major cities within that region
+- Include state/province (admin1) and country when identifiable
+- Use null for unknown admin1 or country fields`,
+      prompt: `Extract location candidates from this phrase: "${query}"
+      
+Examples:
+- "the big apple" → New York (city), New York (state), United States (country)
+- "city of lights" → Paris (city), Île-de-France (admin1), France (country)
+- "emerald city" → Seattle (city), Washington (state), United States (country)
+- "Southeast Asia" → Bangkok, Singapore, Kuala Lumpur, etc. (specific cities, not the region itself)`,
     });
 
-    const geocoded = await geocodeCandidates(object.candidates);
+    // Extract candidates from tool calls
+    let candidates: Array<{ name: string; admin1: string | null; country: string | null }> = [];
+    
+    if (result.toolCalls && result.toolCalls.length > 0) {
+      const toolCall = result.toolCalls[0];
+      if (toolCall.toolName === "extractPlaces" && 'input' in toolCall) {
+        const input = toolCall.input as { candidates: Array<{ name: string; admin1: string | null; country: string | null }> };
+        candidates = input.candidates || [];
+      }
+    }
+
+    // Fallback if no tool calls were made
+    if (candidates.length === 0) {
+      console.warn("No tool calls made for query:", query, "- using fallback extraction");
+      candidates = [{ 
+        name: query.split(/[,\s]+/)[0] || query,
+        admin1: null, 
+        country: null 
+      }];
+    }
+
+    // Geocode the candidates
+    const geocoded = await geocodeCandidates(candidates);
     
     if (geocoded.length === 0) {
       return NextResponse.json(
-        { error: "No geocoding results" },
+        { 
+          error: "No geocoding results found",
+          suggestion: "Try a more specific location name"
+        },
         { status: 404 }
       );
     }
 
+    // Sort by confidence and prepare response
     const [top, ...rest] = geocoded.sort((a, b) => b.confidence - a.confidence);
     const response = {
       place: top,
       candidates: rest.slice(0, 4),
     };
 
-    // Validate against our schema to ensure shape
+    // Validate response structure
     ResolvedPlaceSchema.parse(response.place);
     response.candidates?.forEach((c) => ResolvedPlaceSchema.parse(c));
 
     return NextResponse.json(response);
+    
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
+      console.error("Validation error:", err.issues);
+      return NextResponse.json({ 
+        error: "Invalid request format",
+        details: err.issues 
+      }, { status: 400 });
     }
+    
     console.error("/api/resolve error", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({ 
+      error: "Failed to process location query",
+      message: err instanceof Error ? err.message : "Unknown error"
+    }, { status: 500 });
   }
 }
 
+type Candidate = {
+  name: string;
+  admin1: string | null;
+  country: string | null;
+};
+
 async function geocodeCandidates(
-  candidates: z.infer<typeof CandidateSchema>[]
+  candidates: Candidate[]
 ) {
-  const results: Array<z.infer<typeof ResolvedPlaceSchema>> = [] as any;
+  const results: Array<z.infer<typeof ResolvedPlaceSchema>> = [];
 
   for (const c of candidates) {
     // Use just the city name for the search, Open-Meteo doesn't handle complex queries well
@@ -76,11 +138,18 @@ async function geocodeCandidates(
     try {
       const res = await fetch(url.toString());
       const json = await res.json();
-      let items = (json?.results ?? []) as any[];
+      let items = (json?.results ?? []) as Array<{
+        name?: string;
+        admin1?: string;
+        country?: string;
+        country_code?: string;
+        latitude?: number | string;
+        longitude?: number | string;
+      }>;
       
       // Filter by country/admin1 if provided
       if (c.country || c.admin1) {
-        items = items.filter((item: any) => {
+        items = items.filter((item) => {
           const countryMatch = !c.country || 
             item.country?.toLowerCase().includes(c.country.toLowerCase()) ||
             item.country_code?.toLowerCase() === c.country.toLowerCase();
@@ -102,7 +171,7 @@ async function geocodeCandidates(
         const alt = items[i];
         results.push(toResolvedPlace(alt, 0.6));
       }
-    } catch (error) {
+    } catch {
       // Silently skip this candidate if geocoding fails
     }
   }
@@ -119,7 +188,13 @@ async function geocodeCandidates(
   return deduped;
 }
 
-function toResolvedPlace(raw: any, confidence: number) {
+function toResolvedPlace(raw: {
+  name?: string;
+  admin1?: string;
+  country?: string;
+  latitude?: number | string;
+  longitude?: number | string;
+}, confidence: number) {
   return {
     name: raw?.name ?? "",
     admin1: raw?.admin1 ?? undefined,
