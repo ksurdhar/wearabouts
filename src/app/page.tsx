@@ -71,6 +71,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [layoutTransitioned, setLayoutTransitioned] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   async function fetchOutfits(place: ResolvedPlace, days: DayForecast[]) {
     setLoadingOutfits(true);
@@ -159,19 +160,24 @@ export default function Home() {
     fetchForecast(candidate.lat, candidate.lon, candidate);
   }
 
+  function startNewQuery() {
+    // Trigger the transition by setting this flag
+    setIsTransitioning(true);
+    setLayoutTransitioned(false);
+  }
+
   return (
     <div className="min-h-dvh">
       {/* Animated Header for workspace mode */}
       <AnimatePresence>
-        {layoutTransitioned && (
+        {(layoutTransitioned || (hasSearched && isTransitioning)) && (
           <motion.header 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ 
-              duration: 1.5,
-              ease: "easeOut",
-              delay: 0.3
+              duration: 0.3,
+              ease: "easeOut"
             }}
             className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md"
           >
@@ -184,18 +190,28 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      <div className={`mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-6 ${layoutTransitioned ? 'pt-20 pb-12' : 'justify-center'} transition-all duration-1000`}>
+      <div className={`mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-6 ${layoutTransitioned || (hasSearched && isTransitioning) ? 'pt-20 pb-12' : 'justify-center'} transition-all duration-1000`}>
         <main className="w-full">
-          {/* Animated Splash content - centered vertically */}
+          {/* Main content with proper animation sequencing */}
           <AnimatePresence 
             mode="wait"
             onExitComplete={() => {
-              if (hasSearched) {
+              if (isTransitioning) {
+                // After workspace fades out, reset everything
+                setHasSearched(false);
+                setQuery("");
+                setResult(null);
+                setForecast(null);
+                setOutfits(null);
+                setError(null);
+                setIsTransitioning(false);
+              } else if (hasSearched) {
+                // After splash fades out, show workspace
                 setLayoutTransitioned(true);
               }
             }}
           >
-            {!hasSearched && (
+            {!hasSearched && !isTransitioning && (
               <motion.div 
                 initial={{ opacity: 1 }}
                 exit={{ 
@@ -245,6 +261,183 @@ export default function Home() {
                 </div>
               </motion.div>
             )}
+
+            {/* All workspace content wrapped in one motion container */}
+            {layoutTransitioned && !isTransitioning && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                {/* Query Display */}
+                {query && (
+                  <h2 className="text-center text-3xl font-semibold mb-8 mt-12">
+                    "{query}"
+                  </h2>
+                )}
+
+                {/* Location result */}
+                {result && (
+                  <div className="mb-8">
+                    <div className="mx-auto max-w-xl">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <h2 className="text-lg font-semibold">
+                                {result.place.name}
+                                {result.place.admin1 && `, ${result.place.admin1}`}
+                              </h2>
+                              {result.place.country && (
+                                <p className="text-sm text-muted-foreground">{result.place.country}</p>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        {result.candidates && result.candidates.length > 0 && (
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground mb-2">Not quite right? Try:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {result.candidates.slice(0, 3).map((candidate, i) => (
+                                <Badge
+                                  key={i}
+                                  variant="outline"
+                                  className="cursor-pointer hover:bg-secondary"
+                                  onClick={() => selectCandidate(candidate)}
+                                >
+                                  {candidate.name}
+                                  {candidate.admin1 && `, ${candidate.admin1}`}
+                                </Badge>
+                              ))}
+                            </div>
+                          </CardContent>
+                        )}
+                        <CardContent className="pt-0 pb-3">
+                          <div className="flex justify-end">
+                            <Button
+                              onClick={startNewQuery}
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              New query
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                )}
+
+                {/* Forecast display */}
+                {(loadingForecast || forecast) && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 text-center">
+                      7-Day Forecast
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                      {loadingForecast ? (
+                        // Loading skeletons
+                        Array.from({ length: 7 }).map((_, i) => (
+                          <div key={i}>
+                            <Card className="overflow-hidden">
+                              <Skeleton className="h-48 w-full" />
+                            </Card>
+                          </div>
+                        ))
+                      ) : forecast ? (
+                        // Actual forecast cards
+                        forecast.map((day, i) => {
+                          const dayOutfit = outfits?.find(o => o.date === day.date);
+                          return (
+                            <div key={i}>
+                              <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                                <CardContent className="p-4">
+                                  <div className="space-y-3">
+                                    {/* Weather Section */}
+                                    <div className="text-center space-y-2">
+                                      <p className="text-sm font-medium">
+                                        {formatDate(day.date)}
+                                      </p>
+                                      <div className="flex justify-center py-2">
+                                        <WeatherIcon condition={day.condition} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-lg font-semibold">
+                                          {day.highF}° / {day.lowF}°
+                                        </p>
+                                        {day.precipChance > 30 && (
+                                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                            <Droplets className="h-3 w-3" />
+                                            {day.precipChance}%
+                                          </div>
+                                        )}
+                                        {day.windMph > 15 && (
+                                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                            <Wind className="h-3 w-3" />
+                                            {day.windMph} mph
+                                          </div>
+                                        )}
+                                        {day.uvIndex > 6 && (
+                                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                            <SunMedium className="h-3 w-3" />
+                                            UV {day.uvIndex}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Outfit Section */}
+                                    {(loadingOutfits || dayOutfit) && (
+                                      <>
+                                        <div className="border-t pt-3">
+                                          <div className="flex items-center justify-center gap-1 mb-2">
+                                            <Shirt className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-xs font-medium text-muted-foreground">What to wear</span>
+                                          </div>
+                                          {loadingOutfits && !dayOutfit ? (
+                                            <div className="space-y-2">
+                                              <Skeleton className="h-4 w-full" />
+                                              <Skeleton className="h-4 w-3/4 mx-auto" />
+                                            </div>
+                                          ) : dayOutfit ? (
+                                            <div className="space-y-2">
+                                              <div className="flex flex-wrap gap-1 justify-center">
+                                                {dayOutfit.outfit.slice(0, 4).map((item, idx) => (
+                                                  <Badge key={idx} variant="outline" className="text-xs py-0 px-1.5">
+                                                    {item}
+                                                  </Badge>
+                                                ))}
+                                              </div>
+                                              {dayOutfit.outfit.length > 4 && (
+                                                <p className="text-xs text-center text-muted-foreground">
+                                                  +{dayOutfit.outfit.length - 4} more
+                                                </p>
+                                              )}
+                                              {dayOutfit.notes && (
+                                                <p className="text-xs text-center text-muted-foreground italic mt-2 px-2">
+                                                  {dayOutfit.notes}
+                                                </p>
+                                              )}
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          );
+                        })
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
           </AnimatePresence>
 
         {/* Error display */}
@@ -254,218 +447,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Animated Query Display */}
-        <AnimatePresence>
-          {layoutTransitioned && query && (
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{
-                duration: 0.8,
-                delay: 0.2,
-                ease: "easeOut"
-              }}
-              className="text-center text-3xl font-semibold mb-8 mt-12"
-            >
-              "{query}"
-            </motion.h2>
-          )}
-        </AnimatePresence>
 
-        {/* Animated Location result */}
-        <AnimatePresence>
-          {result && (
-            <motion.div 
-              initial={{ opacity: 0, y: 60, scale: 0.85 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -30, scale: 0.9 }}
-              transition={{ 
-                duration: 1.2,
-                delay: layoutTransitioned ? 0.4 : 0,
-                ease: [0.43, 0.13, 0.23, 0.96]
-              }}
-              className="mb-8"
-            >
-              <div className="mx-auto max-w-xl">
-                  <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <h2 className="text-lg font-semibold">
-                          {result.place.name}
-                          {result.place.admin1 && `, ${result.place.admin1}`}
-                        </h2>
-                        {result.place.country && (
-                          <p className="text-sm text-muted-foreground">{result.place.country}</p>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  {result.candidates && result.candidates.length > 0 && (
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-2">Not quite right? Try:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {result.candidates.map((candidate, i) => (
-                          <Badge
-                            key={i}
-                            variant="outline"
-                            className="cursor-pointer hover:bg-secondary"
-                            onClick={() => selectCandidate(candidate)}
-                          >
-                            {candidate.name}
-                            {candidate.admin1 && `, ${candidate.admin1}`}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  )}
-                  </Card>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Animated Forecast display */}
-        <AnimatePresence>
-          {(loadingForecast || forecast) && (
-            <motion.div
-              initial={{ opacity: 0, y: 60 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              transition={{ 
-                duration: 0.8,
-                delay: 0.2,
-                ease: [0.43, 0.13, 0.23, 0.96]
-              }}
-            >
-              <motion.h3 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="text-lg font-semibold mb-4 text-center"
-              >
-                7-Day Forecast
-              </motion.h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                {loadingForecast ? (
-                  // Loading skeletons with staggered animation
-                  Array.from({ length: 7 }).map((_, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ 
-                        duration: 0.4,
-                        delay: 0.5 + i * 0.05,
-                        ease: "easeOut"
-                      }}
-                    >
-                      <Card className="overflow-hidden">
-                        <Skeleton className="h-48 w-full" />
-                      </Card>
-                    </motion.div>
-                  ))
-                ) : forecast ? (
-                  // Actual forecast cards with staggered entrance
-                  forecast.map((day, i) => {
-                    const dayOutfit = outfits?.find(o => o.date === day.date);
-                    return (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 30, scale: 0.9 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{ 
-                          duration: 0.5,
-                          delay: 0.6 + i * 0.08,
-                          ease: [0.43, 0.13, 0.23, 0.96]
-                        }}
-                      >
-                        <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          {/* Weather Section */}
-                          <div className="text-center space-y-2">
-                            <p className="text-sm font-medium">
-                              {formatDate(day.date)}
-                            </p>
-                            <div className="flex justify-center py-2">
-                              <WeatherIcon condition={day.condition} />
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-lg font-semibold">
-                                {day.highF}° / {day.lowF}°
-                              </p>
-                              {day.precipChance > 30 && (
-                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                  <Droplets className="h-3 w-3" />
-                                  {day.precipChance}%
-                                </div>
-                              )}
-                              {day.windMph > 15 && (
-                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                  <Wind className="h-3 w-3" />
-                                  {day.windMph} mph
-                                </div>
-                              )}
-                              {day.uvIndex > 6 && (
-                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                  <SunMedium className="h-3 w-3" />
-                                  UV {day.uvIndex}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Outfit Section */}
-                          {(loadingOutfits || dayOutfit) && (
-                            <>
-                              <div className="border-t pt-3">
-                                <div className="flex items-center justify-center gap-1 mb-2">
-                                  <Shirt className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-xs font-medium text-muted-foreground">What to wear</span>
-                                </div>
-                                {loadingOutfits && !dayOutfit ? (
-                                  <div className="space-y-2">
-                                    <Skeleton className="h-4 w-full" />
-                                    <Skeleton className="h-4 w-3/4 mx-auto" />
-                                  </div>
-                                ) : dayOutfit ? (
-                                  <div className="space-y-2">
-                                    <div className="flex flex-wrap gap-1 justify-center">
-                                      {dayOutfit.outfit.slice(0, 4).map((item, idx) => (
-                                        <Badge key={idx} variant="outline" className="text-xs py-0 px-1.5">
-                                          {item}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                    {dayOutfit.outfit.length > 4 && (
-                                      <p className="text-xs text-center text-muted-foreground">
-                                        +{dayOutfit.outfit.length - 4} more
-                                      </p>
-                                    )}
-                                    {dayOutfit.notes && (
-                                      <p className="text-xs text-center text-muted-foreground italic mt-2 px-2">
-                                        {dayOutfit.notes}
-                                      </p>
-                                    )}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </CardContent>
-                        </Card>
-                      </motion.div>
-                    );
-                  })
-                ) : null}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Debug view - collapsible */}
         {result && (
