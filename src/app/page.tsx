@@ -322,7 +322,7 @@ export default function Home() {
                   >
                     <div className="mx-auto max-w-md">
                       <Card>
-                        <CardHeader className="pb-3">
+                        <CardHeader className="py-3">
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground" />
                             <div>
@@ -376,7 +376,7 @@ export default function Home() {
                           const dayOutfit = outfits?.find(o => o.date === day.date);
                           return (
                             <div key={i} className="h-full">
-                              <Card className="overflow-hidden hover:shadow-md transition-shadow h-full">
+                              <Card className="overflow-hidden hover:shadow-md focus-within:shadow-md transition-shadow h-full group relative" tabIndex={0}>
                                 <CardContent className="p-4 h-full">
                                   <div className="flex flex-col h-full gap-3">
                                     {/* Weather Section */}
@@ -433,7 +433,7 @@ export default function Home() {
                                             <div className="space-y-2">
                                               <div className="flex flex-wrap gap-1 justify-center">
                                                 {dayOutfit.outfit.slice(0, 4).map((item, idx) => (
-                                                  <Badge key={idx} variant="outline" className="text-xs py-0 px-1.5">
+                                                  <Badge key={idx} variant="outline" className="text-xs py-0 px-1.5 border-muted-foreground/20 bg-muted/30">
                                                     {item}
                                                   </Badge>
                                                 ))}
@@ -454,6 +454,24 @@ export default function Home() {
                                       </>
                                     )}
                                   </div>
+                                  
+                                  {/* Hover/Focus overlay with full outfit list */}
+                                  {dayOutfit && (
+                                    <div className="absolute inset-0 bg-background/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 p-4 flex flex-col justify-center pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
+                                      <div className="space-y-1">
+                                        {dayOutfit.outfit.map((item, idx) => (
+                                          <p key={idx} className="text-xs text-center">
+                                            {item}
+                                          </p>
+                                        ))}
+                                      </div>
+                                      {dayOutfit.notes && (
+                                        <p className="text-xs text-center text-muted-foreground italic px-2 mt-3">
+                                          {dayOutfit.notes}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
                                 </CardContent>
                               </Card>
                             </div>
