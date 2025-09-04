@@ -182,20 +182,29 @@ export default function Home() {
             }}
             className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md"
           >
-            <div className="px-6 py-4 flex items-center justify-between">
+            <div className="px-6 py-4 grid grid-cols-3 items-center">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                 wearabouts
               </h1>
-              {result && (
-                <Button
-                  onClick={startNewQuery}
-                  variant="ghost"
-                  size="sm"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Search again
-                </Button>
-              )}
+              <div className="flex justify-center">
+                {query && (
+                  <h2 className="text-3xl font-semibold">
+                    "{query}"
+                  </h2>
+                )}
+              </div>
+              <div className="flex justify-end">
+                {result && (
+                  <Button
+                    onClick={startNewQuery}
+                    variant="ghost"
+                    size="sm"
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Search again
+                  </Button>
+                )}
+              </div>
             </div>
           </motion.header>
         )}
@@ -280,41 +289,33 @@ export default function Home() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
+                className="relative"
               >
-                {/* Query Display with absolute positioned globe */}
-                {query && (
-                  <div className="relative mt-12 mb-8">
-                    <h2 className="text-center text-3xl font-semibold">
-                      "{query}"
-                    </h2>
-                    
-                    {/* Globe Loading Indicator - Absolutely positioned */}
-                    <AnimatePresence>
-                      {!result && (loadingResolve || loadingForecast || loadingOutfits) && (
-                        <motion.div 
-                          key="globe"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="absolute left-0 right-0 top-full mt-8 flex justify-center pointer-events-none"
-                        >
-                          <GlobeASCII
-                            size={50}
-                            autoRotate={true}
-                            rotationSpeed={0.01}
-                            className="text-muted-foreground"
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
+                {/* Globe Loading Indicator - Absolute positioned to not affect layout */}
+                <AnimatePresence>
+                  {!result && (loadingResolve || loadingForecast || loadingOutfits) && (
+                    <motion.div 
+                      key="globe"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute inset-x-0 top-24 flex justify-center pointer-events-none"
+                    >
+                      <GlobeASCII
+                        size={50}
+                        autoRotate={true}
+                        rotationSpeed={0.01}
+                        className="text-muted-foreground"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Location result */}
                 {result && (
                   <motion.div 
-                    className="mb-8 mt-12"
+                    className="mb-8"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.3 }}
