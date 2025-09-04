@@ -182,16 +182,26 @@ export default function Home() {
             }}
             className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md"
           >
-            <div className="px-6 py-4">
+            <div className="px-6 py-4 flex items-center justify-between">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                 wearabouts
               </h1>
+              {result && (
+                <Button
+                  onClick={startNewQuery}
+                  variant="ghost"
+                  size="sm"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Search again
+                </Button>
+              )}
             </div>
           </motion.header>
         )}
       </AnimatePresence>
 
-      <div className={`mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-6 ${layoutTransitioned || (hasSearched && isTransitioning) ? 'pt-20 pb-12' : 'justify-center'} transition-all duration-1000`}>
+      <div className={`mx-auto flex min-h-dvh w-full max-w-screen-xl flex-col px-6 ${layoutTransitioned || (hasSearched && isTransitioning) ? 'pt-20 pb-12' : 'justify-center'} transition-all duration-1000`}>
         <main className="w-full">
           {/* Main content with proper animation sequencing */}
           <AnimatePresence 
@@ -309,31 +319,31 @@ export default function Home() {
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.3 }}
                   >
-                    <div className="mx-auto max-w-xl">
+                    <div className="mx-auto max-w-md">
                       <Card>
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-muted-foreground" />
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
                             <div>
-                              <h2 className="text-lg font-semibold">
+                              <h2 className="text-base font-semibold">
                                 {result.place.name}
                                 {result.place.admin1 && `, ${result.place.admin1}`}
                               </h2>
                               {result.place.country && (
-                                <p className="text-sm text-muted-foreground">{result.place.country}</p>
+                                <p className="text-xs text-muted-foreground">{result.place.country}</p>
                               )}
                             </div>
                           </div>
                         </CardHeader>
                         {result.candidates && result.candidates.length > 0 && (
-                          <CardContent>
-                            <p className="text-sm text-muted-foreground mb-2">Not quite right? Try:</p>
-                            <div className="flex flex-wrap gap-2">
+                          <CardContent className="pt-0">
+                            <p className="text-xs text-muted-foreground mb-2">Not quite right? Try:</p>
+                            <div className="flex flex-wrap gap-1.5">
                               {result.candidates.slice(0, 3).map((candidate, i) => (
                                 <Badge
                                   key={i}
                                   variant="outline"
-                                  className="cursor-pointer hover:bg-secondary"
+                                  className="cursor-pointer hover:bg-secondary text-xs"
                                   onClick={() => selectCandidate(candidate)}
                                 >
                                   {candidate.name}
@@ -343,18 +353,6 @@ export default function Home() {
                             </div>
                           </CardContent>
                         )}
-                        <CardContent className="pt-0 pb-3">
-                          <div className="flex justify-end">
-                            <Button
-                              onClick={startNewQuery}
-                              variant="ghost"
-                              size="sm"
-                              className="text-muted-foreground hover:text-foreground"
-                            >
-                              New query
-                            </Button>
-                          </div>
-                        </CardContent>
                       </Card>
                     </div>
                   </motion.div>
@@ -392,22 +390,26 @@ export default function Home() {
                                         <p className="text-lg font-semibold">
                                           {day.highF}° / {day.lowF}°
                                         </p>
-                                        {day.precipChance > 30 && (
-                                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                            <Droplets className="h-3 w-3" />
-                                            {day.precipChance}%
-                                          </div>
-                                        )}
+                                        {/* Weather conditions - fixed height container for UV and rain side by side */}
+                                        <div className="h-5 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                                          {day.precipChance > 30 && (
+                                            <div className="flex items-center gap-1">
+                                              <Droplets className="h-3 w-3" />
+                                              {day.precipChance}%
+                                            </div>
+                                          )}
+                                          {day.uvIndex > 6 && (
+                                            <div className="flex items-center gap-1">
+                                              <SunMedium className="h-3 w-3" />
+                                              UV {day.uvIndex}
+                                            </div>
+                                          )}
+                                        </div>
+                                        {/* Wind on separate line if needed */}
                                         {day.windMph > 15 && (
                                           <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                                             <Wind className="h-3 w-3" />
                                             {day.windMph} mph
-                                          </div>
-                                        )}
-                                        {day.uvIndex > 6 && (
-                                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                            <SunMedium className="h-3 w-3" />
-                                            UV {day.uvIndex}
                                           </div>
                                         )}
                                       </div>
