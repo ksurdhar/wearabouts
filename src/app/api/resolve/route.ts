@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, tool } from "ai";
 import { ResolvedPlaceSchema, ResolveRequestSchema } from "@/lib/schemas";
+import { fetchWithRetry } from "@/lib/utils";
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -136,7 +137,27 @@ async function geocodeCandidates(
     url.searchParams.set("format", "json");
 
     try {
-      const res = await fetch(url.toString());
+      const res = await fetchWithRetry(
+        url.toString(),
+        undefined,
+        {
+          maxRetries: 3,
+          initialDelay: 500,
+          timeout: 5000,
+          retryOn: (response, error) => {
+            // Retry on network errors or server errors
+            if (error) return true;
+            if (response && (response.status >= 500 || response.status === 429)) return true;
+            return false;
+          }
+        }
+      );
+      
+      if (!res.ok) {
+        console.warn(`Geocoding failed for "${c.name}" with status ${res.status}`);
+        continue;
+      }
+      
       const json = await res.json();
       let items = (json?.results ?? []) as Array<{
         name?: string;
@@ -171,8 +192,9 @@ async function geocodeCandidates(
         const alt = items[i];
         results.push(toResolvedPlace(alt, 0.6));
       }
-    } catch {
-      // Silently skip this candidate if geocoding fails
+    } catch (error) {
+      // Log the error but continue with other candidates
+      console.error(`Failed to geocode candidate "${c.name}":`, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 

@@ -5,6 +5,7 @@ import {
   ForecastRequestSchema,
   ForecastResponseSchema,
 } from "@/lib/schemas";
+import { fetchWithRetry } from "@/lib/utils";
 
 // WMO weather code to condition mapping
 function mapWeatherCode(code: number): DayForecast["condition"] {
@@ -70,10 +71,27 @@ export async function POST(req: Request) {
     url.searchParams.set("wind_speed_unit", "mph");
     url.searchParams.set("timezone", "auto");
     
-    // Fetch forecast data
-    const res = await fetch(url.toString());
+    // Fetch forecast data with retry logic
+    const res = await fetchWithRetry(
+      url.toString(),
+      undefined,
+      {
+        maxRetries: 3,
+        initialDelay: 500,
+        timeout: 8000,
+        retryOn: (response, error) => {
+          // Retry on network errors or server errors
+          if (error) return true;
+          if (response && (response.status >= 500 || response.status === 429)) return true;
+          // Don't retry on client errors (4xx except 429)
+          return false;
+        }
+      }
+    );
+    
     if (!res.ok) {
-      throw new Error(`Open-Meteo API error: ${res.status}`);
+      console.error(`Open-Meteo forecast API error: ${res.status} for lat=${lat}, lon=${lon}`);
+      throw new Error(`Weather service unavailable (status: ${res.status})`);
     }
     
     const data = await res.json() as OpenMeteoResponse;
