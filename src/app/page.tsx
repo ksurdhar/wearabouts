@@ -254,6 +254,25 @@ export default function Home() {
           </div>
         )}
 
+        {/* Animated Query Display */}
+        <AnimatePresence>
+          {layoutTransitioned && query && (
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{
+                duration: 0.8,
+                delay: 0.2,
+                ease: "easeOut"
+              }}
+              className="text-center text-3xl font-semibold mb-8 mt-12"
+            >
+              "{query}"
+            </motion.h2>
+          )}
+        </AnimatePresence>
+
         {/* Animated Location result */}
         <AnimatePresence>
           {result && (
@@ -263,10 +282,10 @@ export default function Home() {
               exit={{ opacity: 0, y: -30, scale: 0.9 }}
               transition={{ 
                 duration: 1.2,
-                delay: layoutTransitioned ? 0.2 : 0,
+                delay: layoutTransitioned ? 0.4 : 0,
                 ease: [0.43, 0.13, 0.23, 0.96]
               }}
-              className="mb-8 mt-12"
+              className="mb-8"
             >
               <div className="mx-auto max-w-xl">
                   <Card>
