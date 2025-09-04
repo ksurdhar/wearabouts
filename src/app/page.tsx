@@ -252,10 +252,10 @@ export default function Home() {
                   wearabouts
                 </motion.h1>
                 <motion.p 
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 1, delay: 0.4 }}
-                  className="mx-auto mb-8 max-w-xl text-balance text-muted-foreground"
+                  className="mx-auto mb-4 max-w-xl text-balance text-muted-foreground"
                 >
                   Outfit forecaster. Fit in anywhere with recs based on place and weather.
                 </motion.p>
@@ -272,11 +272,11 @@ export default function Home() {
                   />
                   <Button
                     className="shrink-0"
-                    aria-label="Get outfits"
+                    aria-label="Get fitted"
                     onClick={onSubmit}
                     disabled={loadingResolve || loadingForecast}
                   >
-                    Get outfits
+                    Get fitted
                   </Button>
                 </div>
               </motion.div>
@@ -375,10 +375,10 @@ export default function Home() {
                         forecast.map((day, i) => {
                           const dayOutfit = outfits?.find(o => o.date === day.date);
                           return (
-                            <div key={i}>
-                              <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                                <CardContent className="p-4">
-                                  <div className="space-y-3">
+                            <div key={i} className="h-full">
+                              <Card className="overflow-hidden hover:shadow-md transition-shadow h-full">
+                                <CardContent className="p-4 h-full">
+                                  <div className="flex flex-col h-full gap-3">
                                     {/* Weather Section */}
                                     <div className="text-center space-y-2">
                                       <p className="text-sm font-medium">
@@ -419,7 +419,7 @@ export default function Home() {
                                     {/* Outfit Section */}
                                     {(loadingOutfits || dayOutfit) && (
                                       <>
-                                        <div className="border-t pt-3">
+                                        <div className="border-t pt-3 flex-1 flex flex-col">
                                           <div className="flex items-center justify-center gap-1 mb-2">
                                             <Shirt className="h-4 w-4 text-muted-foreground" />
                                             <span className="text-xs font-medium text-muted-foreground">What to wear</span>
