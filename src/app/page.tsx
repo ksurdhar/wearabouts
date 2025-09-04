@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GlobeASCII } from "@/components/GlobeASCII";
 import { useState } from "react";
 import { z } from "zod";
 import { ResolvedPlaceSchema, DayForecastSchema, DayAdviceSchema } from "@/lib/schemas";
@@ -270,16 +271,44 @@ export default function Home() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                {/* Query Display */}
+                {/* Query Display with absolute positioned globe */}
                 {query && (
-                  <h2 className="text-center text-3xl font-semibold mb-8 mt-12">
-                    "{query}"
-                  </h2>
+                  <div className="relative mt-12 mb-8">
+                    <h2 className="text-center text-3xl font-semibold">
+                      "{query}"
+                    </h2>
+                    
+                    {/* Globe Loading Indicator - Absolutely positioned */}
+                    <AnimatePresence>
+                      {!result && (loadingResolve || loadingForecast || loadingOutfits) && (
+                        <motion.div 
+                          key="globe"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="absolute left-0 right-0 top-full mt-8 flex justify-center pointer-events-none"
+                        >
+                          <GlobeASCII
+                            size={50}
+                            autoRotate={true}
+                            rotationSpeed={0.01}
+                            className="text-muted-foreground"
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )}
 
                 {/* Location result */}
                 {result && (
-                  <div className="mb-8">
+                  <motion.div 
+                    className="mb-8 mt-12"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
                     <div className="mx-auto max-w-xl">
                       <Card>
                         <CardHeader className="pb-3">
@@ -328,26 +357,21 @@ export default function Home() {
                         </CardContent>
                       </Card>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* Forecast display */}
-                {(loadingForecast || forecast) && (
-                  <div>
+                {forecast && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.2 }}
+                  >
                     <h3 className="text-lg font-semibold mb-4 text-center">
                       7-Day Forecast
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                      {loadingForecast ? (
-                        // Loading skeletons
-                        Array.from({ length: 7 }).map((_, i) => (
-                          <div key={i}>
-                            <Card className="overflow-hidden">
-                              <Skeleton className="h-48 w-full" />
-                            </Card>
-                          </div>
-                        ))
-                      ) : forecast ? (
+                      {
                         // Actual forecast cards
                         forecast.map((day, i) => {
                           const dayOutfit = outfits?.find(o => o.date === day.date);
@@ -432,9 +456,9 @@ export default function Home() {
                             </div>
                           );
                         })
-                      ) : null}
+                      }
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </motion.div>
             )}
@@ -450,7 +474,7 @@ export default function Home() {
 
 
         {/* Debug view - collapsible */}
-        {result && (
+        {/* {result && (
           <details className="mx-auto mt-12 max-w-4xl">
             <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
               View raw data
@@ -466,7 +490,7 @@ export default function Home() {
               )}
             </div>
           </details>
-        )}
+        )} */}
         </main>
       </div>
     </div>
