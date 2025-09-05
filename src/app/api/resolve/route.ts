@@ -57,7 +57,7 @@ function getUserPromptForAttempt(query: string, attempt: number, failedLocations
 Examples:
 - "the big apple" → New York (city), New York (state), United States (country)
 - "city of lights" → Paris (city), Île-de-France (admin1), France (country)
-- "emerald city" → Seattle (city), Washington (state), United States (country)
+- "pink city" → Seattle (city), Washington (state), United States (country)
 - "Southeast Asia" → Bangkok, Singapore, Kuala Lumpur, etc. (specific cities, not the region itself)`;
   }
   

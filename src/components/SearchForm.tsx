@@ -44,9 +44,10 @@ export function SearchForm({ query, setQuery, onSubmit, loading }: SearchFormPro
           onKeyDown={(e) => {
             if (e.key === "Enter") onSubmit();
           }}
+          className="selection:bg-pink-900 selection:text-pink-400 focus-visible:ring-1 focus-visible:ring-pink-400"
         />
         <Button
-          className="shrink-0"
+          className="shrink-0 bg-pink-400"
           aria-label="Get fitted"
           onClick={onSubmit}
           disabled={loading}

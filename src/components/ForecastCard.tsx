@@ -21,7 +21,7 @@ interface ForecastCardProps {
 export function ForecastCard({ day, outfit, loadingOutfit }: ForecastCardProps) {
   return (
     <div className="h-full">
-      <Card className="overflow-hidden hover:shadow-md focus-within:shadow-md transition-shadow h-full group relative" tabIndex={0}>
+      <Card className="overflow-hidden hover:shadow-md focus-within:shadow-md hover:border-pink-400 focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-offset-0 transition-all h-full group relative" tabIndex={0}>
         <CardContent className="p-4 h-full">
           <div className="flex flex-col h-full gap-3">
             {/* Weather Section */}

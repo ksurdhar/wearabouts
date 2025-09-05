@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wearabouts
 
-## Getting Started
+An outfit recommendation app that combines weather forecasting with clothing suggestions based on location and context.
 
-First, run the development server:
+Enter a location, event, or vibe (like "ivy league weekend" or "Yankees vs Red Sox in May") and get a 7-day forecast with outfit recommendations for each day. The app uses AI to understand natural language queries and provides weather-appropriate clothing suggestions.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Tech Stack
+
+- **Next.js 15** - React framework using the App Router
+- **TypeScript** - Type safety throughout
+- **Tailwind CSS** - Utility-first styling
+- **Framer Motion** - Animations and transitions
+- **Zod** - Runtime schema validation
+- **OpenAI GPT-4** - Natural language processing
+- **Open-Meteo** - Weather data API
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── page.tsx              # Main app component
+│   └── api/
+│       ├── resolve/          # Location resolution endpoint
+│       ├── forecast/         # Weather data endpoint
+│       └── generate-outfits/ # Outfit recommendations endpoint
+├── components/
+│   ├── SearchForm.tsx        # Search input UI
+│   ├── LocationCard.tsx     # Display resolved location
+│   ├── ForecastCard.tsx     # Individual day forecast
+│   ├── ForecastGrid.tsx     # 7-day forecast layout
+│   └── GlobeASCII.tsx       # Loading animation
+├── hooks/
+│   ├── useSearchWorkflow.ts    # Main orchestration hook
+│   ├── useLocationResolver.ts  # Location API integration
+│   ├── useForecast.ts         # Weather fetching
+│   └── useOutfitGenerator.ts  # Outfit generation
+└── lib/
+    ├── schemas.ts            # Zod schemas and types
+    └── date-utils.ts         # Date formatting helpers
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## How It Works
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Frontend Flow
+1. User enters a query in the search form
+2. `useSearchWorkflow` hook orchestrates the data flow
+3. Location is resolved, then weather is fetched, then outfits are generated
+4. Results display in an animated transition from search to results view
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### API Routes
 
-## Learn More
+**`/api/resolve`**
+- Takes a user query and returns location coordinates
+- Uses OpenAI to parse natural language into locations
+- Falls back through multiple prompt strategies if initial attempts fail
+- Returns confidence scores and alternative location suggestions
 
-To learn more about Next.js, take a look at the following resources:
+**`/api/forecast`**
+- Takes latitude/longitude and fetches weather from Open-Meteo
+- Processes raw weather codes into readable conditions (sun, rain, snow, etc.)
+- Returns 7-day forecast with temperature, precipitation, UV index, and wind
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**`/api/generate-outfits`**
+- Takes location and weather data to generate outfit recommendations
+- Uses temperature-based rules for clothing layers
+- Adds weather-specific items (umbrellas, sunglasses, etc.)
+- Optionally enhances with AI-generated contextual advice
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Setup
 
-## Deploy on Vercel
+```bash
+# Install dependencies
+npm install
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Set environment variables
+OPENAI_API_KEY=your-key-here
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Run development server
+npm run dev
+```
+
+## Architecture Decisions
+
+The codebase prioritizes:
+- **Separation of concerns** - UI components don't contain business logic
+- **Type safety** - Zod schemas validate data at runtime and generate TypeScript types
+- **Error resilience** - Every external API call has retry logic and timeout protection
+- **Clean abstractions** - Complex workflows are encapsulated in reusable hooks

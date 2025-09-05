@@ -22,7 +22,6 @@ export function LoadingGlobe({ show }: LoadingGlobeProps) {
             size={50}
             autoRotate={true}
             rotationSpeed={0.01}
-            className="text-muted-foreground"
           />
         </motion.div>
       )}

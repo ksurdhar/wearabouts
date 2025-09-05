@@ -52,7 +52,7 @@ export function GlobeASCII({
   if (!isClient) {
     return (
       <pre 
-        className={`font-mono text-xs leading-none select-none ${className}`}
+        className={`font-mono text-xs leading-none select-none text-pink-400 ${className}`}
         style={{ lineHeight: 1, letterSpacing: '0.1em' }}
         aria-hidden="true"
       >
@@ -64,7 +64,7 @@ export function GlobeASCII({
   return (
     <pre 
       ref={containerRef}
-      className={`font-mono text-xs leading-none select-none ${className}`}
+      className={`font-mono text-xs leading-none select-none text-pink-400 ${className}`}
       style={{ lineHeight: 1, letterSpacing: '0.1em' }}
       aria-hidden="true"
     />
