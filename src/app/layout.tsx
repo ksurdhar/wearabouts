@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wearabouts — outfit forecaster",
+  title: "wearabouts",
   description:
     "Fit in anywhere with style recs based on place and weather.",
 };
